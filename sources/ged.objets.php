@@ -1,151 +1,130 @@
 <?PHP
 
 
-//
-function dossierLister2($dossier = '')
-{
-
-	// initialisation des variables
-	$sortie = false;
-	
-	// traitement
-	if (is_dir($dossier)) {
-	
-		// Ouverture du dossier
-		$pointeur = @opendir($dossier);
-		
-		// on regarde si le dossier a été ouvert avec succès
-		if ($pointeur !== false) {
-		
-			// intialisation du tableau de sortie
-			$sortie = array();
-			
-			// on parcourt les éléments contenus dans le dossier
-			while ($element = @readdir($pointeur)) {
-			
-				// on élimine les éléments inutiles
-				if ($element != '.' && $element != '..') {
-				
-					// chemin complet
-					$chemin = $dossier . '/' . $element;
-					
-					// on regarde si l'élément est un dossier
-					if (is_dir($chemin)) {
-					
-						$sortie[$element] = [
-							'nom' => $element,
-							'chemin' => $chemin,
-							'dossier' => $dossier,
-							'type' => 'dossier',
-							'contenu' => dossierLister2($chemin),
-							'informations' => []
-						];
-					
-					} else {
-					
-						$sortie[$element] = [
-							'nom' => $element,
-							'chemin' => $chemin,
-							'dossier' => $dossier,
-							'type' => 'document',
-							'contenu' => false,
-							'informations' => documentInformationslire($chemin)
-						];
-					
-					}
-				
-				}
-			
-			}
-			
-			closedir($pointeur);
-		
-		}
-	
-	}
-	
-	// sortie
-	return $sortie;
-
-}
+/**
+ * Objets de base
+ * @package GED
+ * @author Olivier ROUET
+ * @version 1.0.0
+ */
 
 
-//
-function documentInformationslire($cible) {
-
-	$sortie = false;
-	
-	if (is_file($cible)) {
-	
-		$sortie['taille'] = filesize($cible);
-		$sortie['empreinte'] = sha1_file($cible);
-		
-		
-		$finfo = finfo_open(FILEINFO_MIME_TYPE);
-		$mime = finfo_file($finfo, $cible);
-		finfo_close($finfo);
-		
-		$sortie['mime'] = $mime;
-		
-		switch ($mime) {
-		
-			case 'image/jpeg' :
-			
-				$metas = getimagesize($cible);
-				
-				if ($metas !== false) {
-				
-					$sortie['metas'] = $metas;
-				
-				}
-			
-			break;
-		
-		}
-	
-	}
-	
-	return $sortie;
-
-}
-
-
-//
+/**
+ * classe GED_Controleur
+ *
+ */
 class GED_Controleur
 {
 
-	//
+	/**
+	 * Objet MySQLi
+	 *
+	 * @access public
+	 * @var mixed
+	 */
 	public $connexion;
 	
 	
-	//
-	public function __construct ($serveur, $identifiant, $motdepasse, $base)
+	/**
+	 * Adresse du SGBD
+	 *
+	 * @access public
+	 * @var string
+	 */
+	public $sgbd_serveur;
+	
+	
+	/**
+	 * Identifiant de connexion au SGBD
+	 *
+	 * @access public
+	 * @var string
+	 */
+	public $sgbd_identifiant;
+	
+	
+	/**
+	 * Mot de passe de connexion au SGBD
+	 *
+	 * @access public
+	 * @var string
+	 */
+	public $sgbd_motdepasse;
+	
+	
+	/**
+	 * Base de données à utiliser dans le SGBD
+	 *
+	 * @access public
+	 * @var string
+	 */
+	public $sgbd_base;
+	
+	
+	/**
+	 * Constructeur
+	 *
+	 * @param string $serveur
+	 * @param string $identifiant
+	 * @param string $motdepasse
+	 * @param string $base
+	 */
+	public function __construct($serveur, $identifiant, $motdepasse, $base)
 	{
 	
+		// intialisation des variables
 		$this->connexion = false;
+		$this->sgbd_serveur = $serveur;
+		$this->sgbd_identifiant = $identifiant;
+		$this->sgbd_motdepasse = $motdepasse;
+		$this->sgbd_base = $base;
 		
-		// SQL
-		$connexion = mysqli_connect(
-			$serveur,
-			$identifiant,
-			$motdepasse,
-			$base
-		);
-		
-		if ($connexion !== false) {
-		
-			$this->connexion = $connexion;
-		
-		} else {
-		
-			die("Problème de connexion au serveur SQL");
-		
-		}
+		$this->connecter();
 	
 	}
 	
 	
-	//
+	/**
+	 * Connection au SGBD
+	 *
+	 * @return boolean
+	 */
+	public function connecter()
+	{
+	
+		// initialisation des variables
+		$sortie = false;
+		
+		// traitement
+		$connexion = new mysqli(
+			$this->sgbd_serveur,
+			$this->sgbd_identifiant,
+			$this->sgbd_motdepasse,
+			$this->sgbd_base
+		);
+		
+		if ($connexion->connect_error) {
+		
+			die('Connect Error (' . $connexion->connect_errno . ') ' . $connexion->connect_error);
+		
+		} else {
+		
+			$this->connexion = $connexion;
+		
+		}
+		
+		// sortie
+		return $sortie;
+	
+	}
+	
+	
+	/**
+	 * Cherche et renvoie un document
+	 *
+	 * @param string $empreinte
+	 * @return mixed
+	 */
 	public function documentChercher($empreinte)
 	{
 	
@@ -155,7 +134,7 @@ class GED_Controleur
 		// traitement
 		$requete = "SELECT * FROM `ged__documents` WHERE empreinte = '" . ($empreinte) . "';";
 		
-		$resultat = mysqli_query($this->connexion, $requete);
+		$resultat = $this->connexion->query($requete);
 		
 		if ($resultat !== false) {
 		
@@ -163,7 +142,7 @@ class GED_Controleur
 			
 			if ($nombre === 1) {
 			
-				$sortie = mysqli_fetch_assoc($resultat);
+				$sortie = $resultat->fetch_assoc();
 			
 			}
 		
@@ -179,13 +158,19 @@ class GED_Controleur
 	}
 	
 	
-	//
-	public function documentCreer($insert_id, $document)
+	/**
+	 * Ajoute un document à un lot
+	 *
+	 * @param string $lot_id
+	 * @param string $document
+	 * @return mixed
+	 */
+	public function documentCreer($lot_id, $document)
 	{
 	
 		// intialisation des variables
 		$sortie = false;
-		$chemin = CHEMIN_STOCKAGE . $insert_id . '/';
+		$chemin = CHEMIN_STOCKAGE . $lot_id . '/';
 		$nom = $document['nom'];
 		$source = $document['chemin'];
 		$empreinte = $document['informations']['empreinte'];
@@ -202,17 +187,18 @@ class GED_Controleur
 			) VALUE (
 				null,
 				null,
-				'" . ($insert_id) . "',
+				'" . ($lot_id) . "',
 				'" . addslashes($nom) . "',
 				'" . ($empreinte) . "'
 			);
 		";
 		
-		$resultat = mysqli_query($this->connexion, $requete);
+		$resultat = $this->connexion->query($requete);
 		
 		if ($resultat !== false) {
 		
-			$insert_id = mysqli_insert_id($this->connexion);
+			$insert_id = $this->connexion->insert_id;
+			
 			$document_ged = $this->documentLire($insert_id);
 			
 			// Copie du document
@@ -236,7 +222,12 @@ class GED_Controleur
 	}
 	
 	
-	//
+	/**
+	 * Lit un document
+	 *
+	 * @param string $id
+	 * @return mixed
+	 */
 	public function documentLire($id)
 	{
 	
@@ -246,11 +237,11 @@ class GED_Controleur
 		// traitement
 		$requete = "SELECT * FROM `ged__documents` WHERE id = " . ($id) . ";";
 		
-		$resultat = mysqli_query($this->connexion, $requete);
+		$resultat = $this->connexion->query($requete);
 		
 		if ($resultat !== false) {
 		
-			$sortie = mysqli_fetch_assoc($resultat);
+			$sortie = $resultat->fetch_assoc();
 		
 		} else {
 		
@@ -264,7 +255,12 @@ class GED_Controleur
 	}
 	
 	
-	//
+	/**
+	 * Vérifie une empreinte
+	 *
+	 * @param string $empreinte
+	 * @return mixed
+	 */
 	public function empreintesVerifier($empreintes)
 	{
 	
@@ -290,11 +286,11 @@ class GED_Controleur
 		";
 		// print($requete);
 		
-		$resultat = mysqli_query($this->connexion, $requete);
+		$resultat = $this->connexion->query($requete);
 		
 		if ($resultat !== false) {
 		
-			while ($ligne = mysqli_fetch_assoc($resultat)) {
+			while ($ligne = $resultat->fetch_assoc()) {
 			
 				$cle = $ligne['empreinte'];
 				$correspondances[$cle] = $ligne;
@@ -313,7 +309,12 @@ class GED_Controleur
 	}
 	
 	
-	//
+	/**
+	 * Ajoute un lot
+	 *
+	 * @param string $nom
+	 * @return mixed
+	 */
 	public function lotCreer($nom)
 	{
 	
@@ -334,11 +335,12 @@ class GED_Controleur
 			);
 		";
 		
-		$resultat = mysqli_query($this->connexion, $requete);
+		$resultat = $this->connexion->query($requete);
 		
 		if ($resultat !== false) {
 		
-			$insert_id = mysqli_insert_id($this->connexion);
+			$insert_id = $this->connexion->insert_id;
+			
 			$lot_ged = $this->lotLire($insert_id);
 			
 			// Création du dossier de stockage
@@ -367,7 +369,12 @@ class GED_Controleur
 	}
 	
 	
-	//
+	/**
+	 * Cherche et renvoie un lot
+	 *
+	 * @param string $nom
+	 * @return mixed
+	 */
 	public function lotChercher($nom)
 	{
 	
@@ -377,15 +384,15 @@ class GED_Controleur
 		// traitement
 		$requete = "SELECT * FROM `ged__lots` WHERE nom = '" . addslashes($nom) . "';";
 		
-		$resultat = mysqli_query($this->connexion, $requete);
+		$resultat = $this->connexion->query($requete);
 		
 		if ($resultat !== false) {
 		
-			$nombre = mysqli_num_rows($resultat);
+			$nombre = $resultat->num_rows;
 			
 			if ($nombre === 1) {
 			
-				$sortie = mysqli_fetch_assoc($resultat);
+				$sortie = $resultat->fetch_assoc();
 			
 			}
 		
@@ -401,7 +408,12 @@ class GED_Controleur
 	}
 	
 	
-	//
+	/**
+	 * Lit un lot
+	 *
+	 * @param string $id
+	 * @return mixed
+	 */
 	public function lotLire($id)
 	{
 	
@@ -411,11 +423,11 @@ class GED_Controleur
 		// traitement
 		$requete = "SELECT * FROM `ged__lots` WHERE id = " . ($id) . ";";
 		
-		$resultat = mysqli_query($this->connexion, $requete);
+		$resultat = $this->connexion->query($requete);
 		
 		if ($resultat !== false) {
 		
-			$sortie = mysqli_fetch_assoc($resultat);
+			$sortie = $resultat->fetch_assoc();
 		
 		} else {
 		
@@ -429,7 +441,11 @@ class GED_Controleur
 	}
 	
 	
-	//
+	/**
+	 * Liste les lots
+	 *
+	 * @return mixed
+	 */
 	public function lotsLister()
 	{
 	
@@ -446,13 +462,13 @@ class GED_Controleur
 			;
 		";
 		
-		$resultat = mysqli_query($this->connexion, $requete);
+		$resultat = $this->connexion->query($requete);
 		
 		if ($resultat !== false) {
 		
 			$sortie = array();
 			
-			while($ligne = mysqli_fetch_assoc($resultat)) {
+			while($ligne = $resultat->fetch_assoc()) {
 			
 				$sortie[] = $ligne;
 			
