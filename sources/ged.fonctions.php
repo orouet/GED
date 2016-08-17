@@ -15,7 +15,7 @@
  * @param string $dossier
  * @return mixed
  */
-function dossierLister2($dossier = '')
+function GED_dossierLister($dossier = '')
 {
 
 	// initialisation des variables
@@ -50,7 +50,7 @@ function dossierLister2($dossier = '')
 							'chemin' => $chemin,
 							'dossier' => $dossier,
 							'type' => 'dossier',
-							'contenu' => dossierLister2($chemin),
+							'contenu' => GED_dossierLister($chemin),
 							'informations' => []
 						];
 					
@@ -62,7 +62,7 @@ function dossierLister2($dossier = '')
 							'dossier' => $dossier,
 							'type' => 'document',
 							'contenu' => false,
-							'informations' => documentInformationslire($chemin)
+							'informations' => GED_documentInformationslire($chemin)
 						];
 					
 					}
@@ -89,7 +89,7 @@ function dossierLister2($dossier = '')
  * @param string $cible
  * @return mixed
  */
-function documentInformationslire($cible)
+function GED_documentInformationslire($cible)
 {
 
 	// initialisation des variables

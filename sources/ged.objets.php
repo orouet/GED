@@ -109,6 +109,8 @@ class GED_Controleur
 		
 		} else {
 		
+			$connexion->set_charset('utf8');
+			
 			$this->connexion = $connexion;
 		
 		}
